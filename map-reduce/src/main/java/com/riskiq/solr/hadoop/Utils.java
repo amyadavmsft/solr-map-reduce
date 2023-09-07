@@ -20,6 +20,8 @@ import com.google.common.annotations.Beta;
 import com.google.common.base.Strings;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.log4j.PropertyConfigurator;
@@ -29,6 +31,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
 import java.nio.file.Files;
 
 
@@ -86,6 +90,82 @@ public final class Utils {
     return tmpSolrHomeDir;
   }
 
+  public static File copySolrConfigToTempDir(String solrHomeDir, String coreName) throws Exception {
+    log.info("solrHomeDir: {}", solrHomeDir);
+    // Create the temp directory on the local filesystem
+    File tmpSolrHomeDir = Files.createTempDirectory("solr-home-").toFile();
+    File tmpSolrHomeConfDir = new File(tmpSolrHomeDir, "conf");
+    Files.createDirectory(tmpSolrHomeConfDir.toPath());
+    File tmpCoreDir = new File(tmpSolrHomeDir, coreName);
+    Files.createDirectory(tmpCoreDir.toPath());
+    log.info("The tmpSolrHomeDir: {}", tmpSolrHomeDir.getAbsolutePath());
+    log.info("The tmpSolrHomeConfDir: {}", tmpSolrHomeConfDir.getAbsolutePath());
+    log.info("The tmpCoreDir: {}", tmpCoreDir.getAbsolutePath());
+
+    copyFileFromClasspathToTempDir(solrHomeDir, "schema.xml", tmpSolrHomeConfDir);
+    copyFileFromClasspathToTempDir(solrHomeDir, "solrconfig.xml", tmpSolrHomeConfDir);
+    copyFileFromClasspathToTempDir(solrHomeDir, "schema.xml", tmpCoreDir);
+    copyFileFromClasspathToTempDir(solrHomeDir, "solrconfig.xml", tmpCoreDir);
+
+    // Print the list of files and directories in the tmpSolrHomeDir directory
+    log.info("\n\nContents of local solr home dir: {} ", tmpSolrHomeDir);
+    printDirectoryContents(tmpSolrHomeDir, "");
+    log.info("\n\n");
+
+    // Print the list of files and directories in the tmpSolrHomeConfDir directory
+    log.info("\n\nContents of local core dir: {} ", tmpSolrHomeConfDir);
+    printDirectoryContents(tmpSolrHomeConfDir, "");
+    log.info("\n\n");
+
+    // Print the list of files and directories in the tmpCoreDir directory
+    log.info("\n\nContents of local core dir: {} ", tmpCoreDir);
+    printDirectoryContents(tmpCoreDir, "");
+    log.info("\n\n");
+
+    return tmpSolrHomeDir;
+  }
+
+  public static void copyFileFromClasspathToTempDir(String filename, File tempDir) throws Exception {
+    try (InputStream inputStream = Utils.class.getClassLoader().getResourceAsStream(filename)) {
+      if (inputStream == null) {
+        log.error("File {} not found on classpath", filename);
+      } else {
+        // Copy the contents of the input stream to the temporary directory
+        File targetFile = new File(tempDir, filename);
+        FileUtils.copyInputStreamToFile(inputStream, targetFile);
+
+        log.info("File copied to temporary directory: " + targetFile.getAbsolutePath());
+      }
+    }
+  }
+
+  public static void copyFileFromClasspathToTempDir(String solrHomeDir, String filename, File tempDir) throws Exception {
+    try (InputStream inputStream = Utils.class.getClassLoader().getResourceAsStream(solrHomeDir + "/" + filename)) {
+      if (inputStream == null) {
+        log.error("File {} not found on classpath", filename);
+      } else {
+        // Copy the contents of the input stream to the temporary directory
+        File targetFile = new File(tempDir, filename);
+        FileUtils.copyInputStreamToFile(inputStream, targetFile);
+
+        log.info("File copied to temporary directory: " + targetFile.getAbsolutePath());
+      }
+    }
+  }
+
+  public static void printDirectoryContents(File dir, String indent) {
+    File[] fileList = dir.listFiles();
+    if (fileList != null) {
+      for (File file : fileList) {
+        if (file.isDirectory()) {
+          log.info(indent + "[Directory] " + file.getName());
+          printDirectoryContents(file, indent + "    ");
+        } else {
+          log.info(indent + "[File] " + file.getName());
+        }
+      }
+    }
+  }
 
   /**
    * Deletes the Solr home zip file which is created for use in distributed cache.

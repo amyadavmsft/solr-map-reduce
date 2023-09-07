@@ -4,6 +4,7 @@ import com.riskiq.mapreduce.io.FilenameInputFormat;
 import org.apache.commons.cli.*;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
@@ -77,8 +78,15 @@ public class SolrIndexDriver extends Configured implements Tool {
         }
 
         // copy Solr config files to a temporary directory
-        File solrHomeDir = new File(new Path(commandLine.getOptionValue(solrHomeOption.getOpt())).toUri());
-        File tmpSolrHomeDir = Utils.copySolrConfigToTempDir(solrHomeDir, "core1");
+        File tmpSolrHomeDir = null;
+        String solrHomeOptionValue = commandLine.getOptionValue(solrHomeOption.getOpt());
+        log.info("solr-home-dir is: {}", solrHomeOptionValue);
+        if (!solrHomeOptionValue.startsWith("file")) {
+            tmpSolrHomeDir = Utils.copySolrConfigToTempDir(solrHomeOptionValue, "core1");
+        } else {
+            File solrHomeDir = new File(new Path(solrHomeOptionValue).toUri());
+            tmpSolrHomeDir = Utils.copySolrConfigToTempDir(solrHomeDir, "core1");
+        }
 
         SolrOutputFormat.setupSolrHomeCache(tmpSolrHomeDir, job);
 
